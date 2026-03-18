@@ -1,0 +1,136 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (
+          request.auth.token.email == "nealjin29@gmail.com" ||
+          request.auth.token.email == "contact@mangobananawedding.com"
+        );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(data, allowedFields) {
+      return data.keys().hasOnly(allowedFields);
+    }
+
+    function hasRequiredFields(data, requiredFields) {
+      return data.keys().hasAll(requiredFields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidReservation(data) {
+      let requiredFields = ['customerName', 'customerPhone', 'date', 'time', 'teamId', 'totalPrice', 'createdAt', 'status', 'guestCount', 'location', 'travelFee', 'tripodCheck'];
+      let allowedFields = [
+        'customerName', 'customerPhone', 'date', 'time', 'teamId', 'teamName', 
+        'side', 'settlementType', 'weddingHall', 'weddingHallId', 'addOns', 
+        'totalPrice', 'status', 'createdAt', 'tripodCheck', 'isWaitlist', 'staffId', 'staffName',
+        'staffAssignments', 'history', 'uid', 'guestCount', 'location', 'travelFee'
+      ];
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() < 100 &&
+             data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() < 30 &&
+             data.date is string && data.date.size() < 20 &&
+             data.time is string && data.time.size() < 10 &&
+             data.teamId is string && data.teamId.size() < 50 &&
+             data.tripodCheck in ['possible', 'not_checked', 'impossible'] &&
+             (!('teamName' in data) || (data.teamName is string && data.teamName.size() < 100)) &&
+             (!('weddingHall' in data) || (data.weddingHall is string && data.weddingHall.size() < 200)) &&
+             data.totalPrice is number && data.totalPrice >= 0 &&
+             data.status in ['pending', 'confirmed', 'cancelled', 'rejected', 'cancel_requested'] &&
+             data.createdAt is string && data.createdAt.size() < 50 &&
+             data.guestCount is number &&
+             data.location is string &&
+             data.travelFee is number &&
+             (!('staffAssignments' in data) || data.staffAssignments is list) &&
+             (!('history' in data) || data.history is list);
+    }
+
+    function isValidWeddingHall(data) {
+      let requiredFields = ['name', 'province', 'city'];
+      let allowedFields = ['name', 'province', 'city', 'address'];
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.province is string && data.province.size() < 50 &&
+             data.city is string && data.city.size() < 50 &&
+             (!('address' in data) || (data.address is string && data.address.size() < 500));
+    }
+
+    function isValidStaff(data) {
+      let requiredFields = ['name'];
+      let allowedFields = ['name', 'role', 'phone', 'createdAt'];
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             (!('role' in data) || (data.role is string && data.role.size() < 50)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 30)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() < 50));
+    }
+
+    function isValidBlockedDate(data) {
+      let requiredFields = ['date', 'createdAt'];
+      let allowedFields = ['date', 'reason', 'createdAt'];
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             data.date is string && data.date.size() < 20 &&
+             data.createdAt is string && data.createdAt.size() < 50 &&
+             (!('reason' in data) || (data.reason is string && data.reason.size() < 500));
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /reservations/{reservationId} {
+      // Allow anyone to create a reservation (public booking)
+      allow create: if isValidReservation(request.resource.data);
+      
+      // Allow public read/list for user lookup (Insecure: should be restricted in production)
+      allow read, list: if true;
+      
+      // Only admins can update or delete reservations
+      allow update, delete: if isAdmin();
+    }
+
+    match /weddingHalls/{hallId} {
+      // Publicly readable for search functionality
+      allow read, list: if true;
+      // Only admins can manage the database
+      allow create, update: if isAdmin() && isValidWeddingHall(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /staff/{staffId} {
+      // Only admins can manage staff
+      allow read, list: if isAdmin();
+      allow create, update: if isAdmin() && isValidStaff(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /blockedDates/{dateId} {
+      // Publicly readable for calendar availability
+      allow read, list: if true;
+      // Only admins can block/unblock dates
+      allow create, update, delete: if isAdmin() && isValidBlockedDate(request.resource.data);
+    }
+  }
+}

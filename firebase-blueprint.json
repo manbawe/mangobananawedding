@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "Reservation": {
+      "title": "Reservation",
+      "description": "A wedding service reservation",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string", "description": "Customer's full name" },
+        "customerPhone": { "type": "string", "description": "Customer's phone number" },
+        "date": { "type": "string", "description": "ISO date string of the wedding" },
+        "time": { "type": "string", "description": "Selected time slot" },
+        "guestCount": { "type": "number", "description": "Estimated guest count" },
+        "weddingHall": { "type": "string", "description": "Name of the wedding hall" },
+        "location": { "type": "string", "description": "Wedding hall location (city)" },
+        "teamId": { "type": "string", "description": "Selected team option ID" },
+        "teamName": { "type": "string", "description": "Selected team option name" },
+        "settlementType": { "type": "string", "description": "Payment settlement type" },
+        "side": { "type": "string", "description": "Side (Groom/Bride)" },
+        "tripodCheck": { "type": "string", "enum": ["possible", "not_checked", "impossible"], "description": "Tripod installation availability" },
+        "addOns": { "type": "array", "items": { "type": "string" }, "description": "List of selected add-on IDs" },
+        "totalPrice": { "type": "number", "description": "Total price in KRW" },
+        "travelFee": { "type": "number", "description": "Travel fee based on location" },
+        "isWaitlist": { "type": "boolean", "description": "Whether this is a waitlist request" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the reservation was made" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled", "rejected"], "description": "Current status of the reservation" },
+        "staffId": { "type": "string", "description": "ID of the assigned staff member" },
+        "staffName": { "type": "string", "description": "Name of the assigned staff member" },
+        "staffAssignments": { "type": "array", "items": { "type": "object" }, "description": "Detailed staff assignments" }
+      },
+      "required": ["customerName", "customerPhone", "date", "time", "teamId", "totalPrice", "createdAt", "status"]
+    },
+    "Staff": {
+      "title": "Staff",
+      "description": "Information about a staff member",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the staff member" },
+        "role": { "type": "string", "description": "Role or position" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the staff was registered" }
+      },
+      "required": ["name"]
+    },
+    "WeddingHall": {
+      "title": "Wedding Hall",
+      "description": "Information about a wedding hall",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the wedding hall" },
+        "province": { "type": "string", "description": "Province (Do)" },
+        "city": { "type": "string", "description": "City/County/District (Si/Gun/Gu)" },
+        "address": { "type": "string", "description": "Full address" }
+      },
+      "required": ["name", "province", "city"]
+    },
+    "BlockedDate": {
+      "title": "Blocked Date",
+      "description": "A date that is manually blocked by the admin",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "description": "ISO date string (YYYY-MM-DD)" },
+        "reason": { "type": "string", "description": "Reason for blocking" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the date was blocked" }
+      },
+      "required": ["date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "reservations": {
+      "schema": "Reservation",
+      "description": "Collection of wedding service reservations"
+    },
+    "weddingHalls": {
+      "schema": "WeddingHall",
+      "description": "Collection of wedding hall information"
+    },
+    "staff": {
+      "schema": "Staff",
+      "description": "Collection of staff members"
+    },
+    "blockedDates": {
+      "schema": "BlockedDate",
+      "description": "Collection of manually blocked dates"
+    }
+  }
+}
