@@ -1151,6 +1151,11 @@ export default function App() {
       console.error("Admin Login Error:", error);
       if (error.code === 'auth/popup-blocked') {
         setUploadStatus({ message: '팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.', type: 'error' });
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setUploadStatus({ 
+          message: '현재 도메인이 Firebase 승인 도메인에 등록되지 않았습니다. Firebase 콘솔에서 도메인을 추가해 주세요.', 
+          type: 'error' 
+        });
       } else if (error.code === 'auth/too-many-requests') {
         setUploadStatus({ message: '보안을 위해 일시적으로 차단되었습니다. 잠시 후 다시 시도해 주세요.', type: 'error' });
         setLoginCooldown(60);
