@@ -116,6 +116,8 @@ function handleFirestoreError(error: any, operationType: OperationType, path: st
   throw new Error(JSON.stringify(errInfo));
 }
 
+const ADMIN_EMAILS = ['nealjin29@gmail.com', 'contact@mangobananawedding.com'];
+
 // Types
 type TeamOption = {
   id: string;
@@ -356,8 +358,6 @@ export default function App() {
   const [view, setView] = useState<'user' | 'admin' | 'intro'>('user');
   const [adminViewMode, setAdminViewMode] = useState<'list' | 'calendar' | 'data' | 'staff'>('list');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminId, setAdminId] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [csvInput, setCsvInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -448,7 +448,7 @@ export default function App() {
       setUser(currentUser);
       if (currentUser) {
         setCustomerName(currentUser.displayName || '');
-        if (currentUser.email === 'nealjin29@gmail.com' || currentUser.email === 'contact@mangobananawedding.com') {
+        if (currentUser.email && ADMIN_EMAILS.includes(currentUser.email)) {
           setIsAdminAuthenticated(true);
         }
       } else {
@@ -474,7 +474,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) return;
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) return;
 
     const q = query(collection(db, 'staff'), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -699,7 +699,7 @@ export default function App() {
   };
 
   const handleAddStaff = async () => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) {
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
       alert('관리자 권한이 필요합니다.');
       return;
     }
@@ -725,7 +725,7 @@ export default function App() {
   };
 
   const handleDeleteStaff = async (id: string, name: string) => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) {
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
       alert('관리자 권한이 필요합니다.');
       return;
     }
@@ -740,7 +740,7 @@ export default function App() {
   };
 
   const handleAssignStaffAtIndex = async (reservationId: string, index: number, staffId: string, staffName: string) => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) {
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
       alert('관리자 권한이 필요합니다.');
       return;
     }
@@ -894,7 +894,7 @@ export default function App() {
   };
 
   const handleToggleBlockDate = async (dateStr: string) => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) {
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
       alert('관리자 권한이 필요합니다.');
       return;
     }
@@ -1027,7 +1027,7 @@ export default function App() {
   };
 
   const updateReservationStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'pending' | 'rejected' | 'cancel_requested', note?: string) => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) {
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
       alert('관리자 권한이 필요합니다.');
       return;
     }
@@ -1065,7 +1065,7 @@ export default function App() {
   };
 
   const deleteReservation = async (id: string) => {
-    if (!isAdminAuthenticated || !user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com')) {
+    if (!isAdminAuthenticated || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) {
       alert('관리자 권한이 필요합니다.');
       return;
     }
@@ -1086,71 +1086,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [loginCooldown]);
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loginCooldown > 0) {
-      setUploadStatus({ message: `보안을 위해 ${loginCooldown}초 후에 다시 시도해 주세요.`, type: 'info' });
-      return;
-    }
-    if (!adminId || !adminPassword) {
-      setUploadStatus({ message: '아이디와 비밀번호를 모두 입력해 주세요.', type: 'error' });
-      return;
-    }
-
-    setIsLoginSubmitting(true);
-    try {
-      // Check if user is already logged in with the same email
-      const normalizedId = adminId.trim().toLowerCase();
-      const email = normalizedId === 'admin' ? 'contact@mangobananawedding.com' : adminId.trim();
-      
-      if (auth.currentUser && auth.currentUser.email === email) {
-        setIsAdminAuthenticated(true);
-        setUploadStatus({ message: '이미 로그인되어 있습니다.', type: 'success' });
-        setIsLoginSubmitting(false);
-        return;
-      }
-
-      await signInWithEmailAndPassword(auth, email, adminPassword);
-      
-      setIsAdminAuthenticated(true);
-      setUploadStatus({ message: '관리자 로그인 성공', type: 'success' });
-    } catch (error: any) {
-      console.error("Admin Login Error:", error);
-      let message = '로그인 중 오류가 발생했습니다.';
-      
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        message = '아이디 또는 비밀번호가 올바르지 않습니다. 다시 확인해 주세요.';
-      } else if (error.code === 'auth/too-many-requests') {
-        message = '보안을 위해 여러 번의 로그인 실패로 인해 일시적으로 차단되었습니다. 잠시 후 다시 시도해 주세요. (또는 하단의 "Google로 로그인" 버튼을 이용해 즉시 접속해 주세요.)';
-        setLoginCooldown(60); // Set a 1-minute cooldown on the client side as well
-      } else if (error.code === 'auth/network-request-failed') {
-        message = '네트워크 연결 상태를 확인해 주세요.';
-      } else if (error.code === 'auth/user-disabled') {
-        message = '해당 계정은 비활성화되었습니다. 관리자에게 문의해 주세요.';
-      }
-      
-      setUploadStatus({ message, type: 'error' });
-    } finally {
-      setIsLoginSubmitting(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!adminId) {
-      setUploadStatus({ message: '비밀번호를 재설정할 아이디(이메일)를 입력해 주세요.', type: 'info' });
-      return;
-    }
-
-    try {
-      const email = adminId === 'admin' ? 'contact@mangobananawedding.com' : adminId;
-      await sendPasswordResetEmail(auth, email);
-      setUploadStatus({ message: `${email} 주소로 비밀번호 재설정 이메일을 보냈습니다.`, type: 'success' });
-    } catch (error: any) {
-      console.error("Password Reset Error:", error);
-      setUploadStatus({ message: '비밀번호 재설정 이메일 전송 중 오류가 발생했습니다.', type: 'error' });
-    }
-  };
 
   const searchMyReservations = async () => {
     if (!lookupName || lookupPhone.replace(/\D/g, '').length < 10) {
@@ -1205,7 +1140,7 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      if (result.user.email === 'nealjin29@gmail.com' || result.user.email === 'contact@mangobananawedding.com') {
+      if (result.user.email && ADMIN_EMAILS.includes(result.user.email)) {
         setIsAdminAuthenticated(true);
         setUploadStatus({ message: '관리자 로그인 성공', type: 'success' });
       } else {
@@ -1243,65 +1178,21 @@ export default function App() {
               <h2 className="text-2xl font-black text-slate-900">관리자 로그인</h2>
               <p className="text-slate-500 text-sm mt-2">축의대 대행 서비스 관리 시스템</p>
             </div>
-            <div className="space-y-6">
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Admin ID</label>
-                  <input 
-                    type="text" 
-                    value={adminId}
-                    onChange={(e) => setAdminId(e.target.value)}
-                    className="w-full bg-slate-50 border-none rounded-xl py-4 px-6 focus:ring-2 focus:ring-[#0a44b8] transition-all"
-                    placeholder="ID"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Password</label>
-                  <input 
-                    type="password" 
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    className="w-full bg-slate-50 border-none rounded-xl py-4 px-6 focus:ring-2 focus:ring-[#0a44b8] transition-all"
-                    placeholder="•••••••"
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  disabled={isLoginSubmitting || loginCooldown > 0}
-                  className="w-full bg-[#0a44b8] text-white py-4 rounded-xl font-bold shadow-lg shadow-[#0a44b8]/20 hover:bg-[#0a3a9c] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoginSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      로그인 중...
-                    </>
-                  ) : loginCooldown > 0 ? (
-                    `재시도 가능 (${loginCooldown}초)`
-                  ) : (
-                    '접속하기'
-                  )}
-                </button>
-              </form>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-slate-100"></span>
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-slate-400 font-bold">또는</span>
-                </div>
+            <div className="space-y-8">
+              <div className="text-center">
+                <p className="text-slate-500 text-sm mb-6">보안을 위해 승인된 관리자 계정으로만 로그인이 가능합니다.</p>
               </div>
 
               <button 
                 type="button"
                 onClick={handleGoogleAdminLogin}
-                disabled={isLoginSubmitting}
-                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-700 font-bold py-4 rounded-xl transition-all shadow-sm border border-slate-200 disabled:opacity-50"
+                disabled={isLoginSubmitting || loginCooldown > 0}
+                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-700 font-bold py-5 rounded-2xl transition-all shadow-xl shadow-slate-200/50 border border-slate-100 disabled:opacity-50"
               >
                 {isLoginSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                 ) : (
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -1320,25 +1211,14 @@ export default function App() {
                     />
                   </svg>
                 )}
-                {isLoginSubmitting ? '로그인 중...' : 'Google로 로그인'}
+                {isLoginSubmitting ? '로그인 중...' : loginCooldown > 0 ? `${loginCooldown}초 후 재시도 가능` : 'Google 계정으로 관리자 접속'}
               </button>
               
-              <p className="text-[10px] text-center text-slate-400">
-                * nealjin29@gmail.com 계정은 Google 로그인을 권장합니다.
-              </p>
-
-              <div className="flex flex-col gap-2">
-                <button 
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="w-full text-slate-400 text-xs font-bold hover:text-[#0a44b8] transition-colors"
-                >
-                  비밀번호를 잊으셨나요?
-                </button>
+              <div className="flex flex-col gap-4">
                 <button 
                   type="button"
                   onClick={() => setView('user')}
-                  className="w-full text-slate-400 text-sm font-bold hover:text-slate-600 transition-colors pt-2"
+                  className="w-full text-slate-400 text-sm font-bold hover:text-slate-600 transition-colors py-2"
                 >
                   사용자 페이지로 돌아가기
                 </button>
@@ -1482,7 +1362,7 @@ export default function App() {
         </header>
 
         <main className="max-w-7xl mx-auto px-6 py-10">
-          {!user || (user.email !== 'nealjin29@gmail.com' && user.email !== 'contact@mangobananawedding.com') ? (
+          {!user || !user.email || !ADMIN_EMAILS.includes(user.email) ? (
             <div className="mb-8 p-6 bg-orange-50 border border-orange-200 rounded-2xl flex items-center gap-4 text-orange-800">
               <AlertCircle className="w-6 h-6 flex-shrink-0" />
               <div>
