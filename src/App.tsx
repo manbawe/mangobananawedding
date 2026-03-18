@@ -865,6 +865,9 @@ export default function App() {
 
     const dayReservations = reservations.filter(r => r.date === dateStr && r.status !== 'cancelled' && r.status !== 'rejected');
     
+    // If any reservation is confirmed, it's full (no more waitlist)
+    if (dayReservations.some(r => r.status === 'confirmed')) return 'full';
+
     const hasMain = dayReservations.some(r => !r.isWaitlist);
     const waitlistCount = dayReservations.filter(r => r.isWaitlist).length;
 
@@ -1034,12 +1037,26 @@ export default function App() {
         status,
         note: note || ""
       };
-      await updateDoc(doc(db, 'reservations', id), { 
+      
+      const updateData: any = { 
         status,
         history: arrayUnion(historyEntry)
-      });
+      };
+
+      // If confirming, it's no longer a waitlist
+      if (status === 'confirmed') {
+        updateData.isWaitlist = false;
+      }
+
+      await updateDoc(doc(db, 'reservations', id), updateData);
+      
       if (selectedReservationForDetail && selectedReservationForDetail.id === id) {
-        setSelectedReservationForDetail(prev => prev ? { ...prev, status, history: [...(prev.history || []), historyEntry] } : null);
+        setSelectedReservationForDetail(prev => prev ? { 
+          ...prev, 
+          status, 
+          isWaitlist: status === 'confirmed' ? false : prev.isWaitlist,
+          history: [...(prev.history || []), historyEntry] 
+        } : null);
       }
     } catch (error) {
       console.error("Error updating status:", error);
@@ -1071,9 +1088,16 @@ export default function App() {
     }
 
     try {
-      // Map 'admin' ID to 'contact@mangobananawedding.com' for Firebase Auth
-      const email = adminId === 'admin' ? 'contact@mangobananawedding.com' : adminId;
+      // Check if user is already logged in with the same email
+      const normalizedId = adminId.trim().toLowerCase();
+      const email = normalizedId === 'admin' ? 'contact@mangobananawedding.com' : adminId.trim();
       
+      if (auth.currentUser && auth.currentUser.email === email) {
+        setIsAdminAuthenticated(true);
+        setUploadStatus({ message: '이미 로그인되어 있습니다.', type: 'success' });
+        return;
+      }
+
       await signInWithEmailAndPassword(auth, email, adminPassword);
       
       setIsAdminAuthenticated(true);
@@ -1088,6 +1112,8 @@ export default function App() {
         message = '보안을 위해 여러 번의 로그인 실패로 인해 일시적으로 차단되었습니다. 잠시 후 다시 시도하거나 비밀번호를 재설정해 주세요.';
       } else if (error.code === 'auth/network-request-failed') {
         message = '네트워크 연결 상태를 확인해 주세요.';
+      } else if (error.code === 'auth/user-disabled') {
+        message = '해당 계정은 비활성화되었습니다. 관리자에게 문의해 주세요.';
       }
       
       setUploadStatus({ message, type: 'error' });
@@ -1162,15 +1188,20 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      if (result.user.email === 'nealjin29@gmail.com') {
+      if (result.user.email === 'nealjin29@gmail.com' || result.user.email === 'contact@mangobananawedding.com') {
         setIsAdminAuthenticated(true);
+        setUploadStatus({ message: '관리자 로그인 성공', type: 'success' });
       } else {
-        alert('관리자 권한이 없는 계정입니다.');
+        setUploadStatus({ message: '관리자 권한이 없는 계정입니다.', type: 'error' });
         await signOut(auth);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Admin Login Error:", error);
-      alert('로그인 중 오류가 발생했습니다.');
+      if (error.code === 'auth/popup-blocked') {
+        setUploadStatus({ message: '팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.', type: 'error' });
+      } else {
+        setUploadStatus({ message: '로그인 중 오류가 발생했습니다.', type: 'error' });
+      }
     }
   };
 
@@ -1254,6 +1285,10 @@ export default function App() {
                 </svg>
                 Google로 로그인
               </button>
+              
+              <p className="text-[10px] text-center text-slate-400">
+                * nealjin29@gmail.com 계정은 Google 로그인을 권장합니다.
+              </p>
 
               <div className="flex flex-col gap-2">
                 <button 
@@ -1399,10 +1434,7 @@ export default function App() {
                 사용자 페이지
               </button>
               <button 
-                onClick={() => {
-                  setIsAdminAuthenticated(false);
-                  setAdminPassword('');
-                }}
+                onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-bold text-sm transition-all"
               >
                 <LogOut className="w-4 h-4" />
