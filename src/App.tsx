@@ -60,7 +60,7 @@ import {
   arrayUnion,
   getDocs
 } from 'firebase/firestore';
-import { onAuthStateChanged, signOut, User, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { WEDDING_HALLS, WeddingHall } from './data/weddingHalls';
 import { uploadWeddingHallsFromCSV, clearWeddingHalls } from './utils/csvUploader';
 
@@ -1081,10 +1081,32 @@ export default function App() {
     } catch (error: any) {
       console.error("Admin Login Error:", error);
       let message = '로그인 중 오류가 발생했습니다.';
+      
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        message = '아이디 또는 비밀번호가 틀렸습니다.';
+        message = '아이디 또는 비밀번호가 올바르지 않습니다. 다시 확인해 주세요.';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = '보안을 위해 여러 번의 로그인 실패로 인해 일시적으로 차단되었습니다. 잠시 후 다시 시도하거나 비밀번호를 재설정해 주세요.';
+      } else if (error.code === 'auth/network-request-failed') {
+        message = '네트워크 연결 상태를 확인해 주세요.';
       }
+      
       setUploadStatus({ message, type: 'error' });
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!adminId) {
+      setUploadStatus({ message: '비밀번호를 재설정할 아이디(이메일)를 입력해 주세요.', type: 'info' });
+      return;
+    }
+
+    try {
+      const email = adminId === 'admin' ? 'contact@mangobananawedding.com' : adminId;
+      await sendPasswordResetEmail(auth, email);
+      setUploadStatus({ message: `${email} 주소로 비밀번호 재설정 이메일을 보냈습니다.`, type: 'success' });
+    } catch (error: any) {
+      console.error("Password Reset Error:", error);
+      setUploadStatus({ message: '비밀번호 재설정 이메일 전송 중 오류가 발생했습니다.', type: 'error' });
     }
   };
 
@@ -1198,13 +1220,57 @@ export default function App() {
                 </button>
               </form>
 
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-slate-100"></span>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-slate-400 font-bold">또는</span>
+                </div>
+              </div>
+
               <button 
                 type="button"
-                onClick={() => setView('user')}
-                className="w-full text-slate-400 text-sm font-bold hover:text-slate-600 transition-colors pt-2"
+                onClick={handleGoogleAdminLogin}
+                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-700 font-bold py-4 rounded-xl transition-all shadow-sm border border-slate-200"
               >
-                사용자 페이지로 돌아가기
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                Google로 로그인
               </button>
+
+              <div className="flex flex-col gap-2">
+                <button 
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="w-full text-slate-400 text-xs font-bold hover:text-[#0a44b8] transition-colors"
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setView('user')}
+                  className="w-full text-slate-400 text-sm font-bold hover:text-slate-600 transition-colors pt-2"
+                >
+                  사용자 페이지로 돌아가기
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>
@@ -2620,7 +2686,12 @@ export default function App() {
                     {item.icon}
                   </div>
                   <h4 className="text-xl font-bold text-slate-900 mb-4">{item.title}</h4>
-                  <p className="text-slate-500 leading-relaxed text-sm">{item.desc}</p>
+                  <p 
+                    className="text-slate-500 leading-relaxed text-sm"
+                    style={idx === 1 ? { width: '220px' } : undefined}
+                  >
+                    {item.desc}
+                  </p>
                 </motion.div>
               ))}
             </section>
